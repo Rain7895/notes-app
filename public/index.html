@@ -1,0 +1,1610 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>便签</title>
+<style>
+/* ========== Reset & Variables ========== */
+:root {
+  --bg: #f0f1f5;
+  --surface: #ffffff;
+  --surface-hover: #f7f8fa;
+  --text-primary: #1a1a1e;
+  --text-secondary: #8e8e93;
+  --text-tertiary: #aeaeb2;
+  --border: #e5e5ea;
+  --accent: #ffb300;
+  --accent-light: #fff8e1;
+  --accent-dark: #ffa000;
+  --danger: #ff3b30;
+  --danger-light: #fff0ef;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-lg: 0 4px 20px rgba(0,0,0,0.08);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --nav-height: 60px;
+  --header-height: 56px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+.dark {
+  --bg: #1a1a1e;
+  --surface: #2c2c30;
+  --surface-hover: #38383d;
+  --text-primary: #f1f1f3;
+  --text-secondary: #8e8e93;
+  --text-tertiary: #636366;
+  --border: #38383d;
+  --accent-light: #3a3200;
+  --danger-light: #3d1a1a;
+  --shadow: 0 1px 3px rgba(0,0,0,0.2);
+  --shadow-lg: 0 4px 20px rgba(0,0,0,0.3);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+input, textarea, [contenteditable] { user-select: text; }
+a { color: var(--accent); text-decoration: none; }
+
+/* ========== Scrollbar ========== */
+.scroll-area::-webkit-scrollbar { width: 4px; }
+.scroll-area::-webkit-scrollbar-track { background: transparent; }
+.scroll-area::-webkit-scrollbar-thumb { background: var(--text-tertiary); border-radius: 2px; }
+
+/* ========== App Shell ========== */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  max-width: 768px;
+  margin: 0 auto;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ========== Header ========== */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 8px;
+  min-height: var(--header-height);
+  flex-shrink: 0;
+}
+.header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+.header-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: var(--surface);
+  border-radius: 50%;
+  color: var(--text-secondary);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  box-shadow: var(--shadow);
+}
+.icon-btn:hover, .icon-btn:active { background: var(--surface-hover); color: var(--text-primary); }
+.icon-btn.active { background: var(--accent-light); color: var(--accent-dark); }
+.icon-btn.syncing { animation: spin 1s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.sync-status {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 11px; color: var(--text-tertiary);
+  padding: 0 16px 6px; justify-content: center;
+}
+.sync-status .dot {
+  width: 6px; height: 6px; border-radius: 50%; display: inline-block;
+}
+.sync-status .dot.online { background: #34c759; }
+.sync-status .dot.offline { background: #ff3b30; }
+.sync-status .dot.syncing { background: var(--accent); animation: pulse 0.8s ease infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+/* ========== Search Bar ========== */
+.search-bar {
+  display: flex;
+  align-items: center;
+  margin: 0 16px 12px;
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 0 12px;
+  min-height: 40px;
+  box-shadow: var(--shadow);
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+.search-bar:focus-within {
+  box-shadow: 0 0 0 2px var(--accent), var(--shadow);
+}
+.search-bar .icon {
+  color: var(--text-tertiary);
+  font-size: 18px;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+.search-bar input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 15px;
+  color: var(--text-primary);
+  font-family: var(--font);
+  padding: 8px 0;
+}
+.search-bar input::placeholder { color: var(--text-tertiary); }
+
+/* ========== Category Tabs ========== */
+.category-tabs {
+  display: flex;
+  gap: 0;
+  padding: 0 16px;
+  overflow-x: auto;
+  flex-shrink: 0;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  margin-bottom: 4px;
+}
+.category-tabs::-webkit-scrollbar { display: none; }
+.cat-tab {
+  white-space: nowrap;
+  padding: 6px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 20px;
+  transition: all 0.2s;
+  position: relative;
+  flex-shrink: 0;
+}
+.cat-tab.active {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+.cat-tab:not(.active):hover { background: var(--surface); }
+.cat-tab .badge {
+  display: inline-block;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+.cat-tab.active .badge { background: rgba(255,255,255,0.3); color: #fff; }
+
+/* ========== Notes List ========== */
+.notes-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 16px 80px;
+  -webkit-overflow-scrolling: touch;
+}
+.notes-list { display: flex; flex-direction: column; gap: 2px; }
+
+.pinned-section { margin-bottom: 4px; }
+.pinned-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 12px 4px 6px;
+}
+.pinned-header::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.note-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: var(--shadow);
+  position: relative;
+  overflow: hidden;
+}
+.note-card:hover, .note-card:active { background: var(--surface-hover); transform: translateY(-1px); box-shadow: var(--shadow-lg); }
+.note-card.pinned { border-left: 3px solid var(--accent); }
+
+.note-card .color-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  border-radius: 4px 0 0 4px;
+}
+.note-card .color-bar.blue { background: #2196f3; }
+.note-card .color-bar.green { background: #4caf50; }
+.note-card .color-bar.red { background: #f44336; }
+.note-card .color-bar.purple { background: #9c27b0; }
+.note-card .color-bar.orange { background: #ff9800; }
+.note-card .color-bar.teal { background: #009688; }
+.note-card .color-bar.none { display: none; }
+
+.note-card .card-content { margin-left: 0; }
+.note-card .card-title {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-bottom: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.note-card .card-preview {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.note-card .card-preview.todo-preview .todo-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+.note-card .card-preview.todo-preview .todo-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--text-tertiary);
+  flex-shrink: 0;
+}
+.note-card .card-preview.todo-preview .todo-dot.done {
+  background: var(--accent);
+  border-color: var(--accent);
+  position: relative;
+}
+.note-card .card-preview.todo-preview .todo-dot.done::after {
+  content: '✓';
+  color: #fff;
+  font-size: 9px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%,-50%);
+  font-weight: 700;
+}
+.note-card .card-preview.todo-preview .todo-text { font-size: 12px; }
+.note-card .card-preview.todo-preview .todo-text.done { text-decoration: line-through; color: var(--text-tertiary); }
+
+.note-card .card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+.note-card .card-meta .tags {
+  display: flex;
+  gap: 4px;
+}
+.note-card .card-meta .tag {
+  background: var(--bg);
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.note-card .card-meta .pin-icon { color: var(--accent); font-size: 14px; }
+
+/* ========== Empty State ========== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+.empty-state .empty-icon {
+  font-size: 56px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+.empty-state h3 { font-size: 18px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; }
+.empty-state p { font-size: 14px; line-height: 1.5; max-width: 280px; }
+
+/* ========== FAB ========== */
+.fab {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(255,179,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 10;
+  touch-action: manipulation;
+}
+.fab:hover { transform: scale(1.08); box-shadow: 0 6px 20px rgba(255,179,0,0.5); }
+.fab:active { transform: scale(0.95); }
+
+/* ========== Create Menu Sheet ========== */
+.overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 50;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+.overlay.show { opacity: 1; pointer-events: auto; }
+
+.sheet {
+  position: fixed;
+  left: 0; right: 0;
+  bottom: 0;
+  background: var(--surface);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  z-index: 51;
+  transform: translateY(100%);
+  transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+  padding-bottom: var(--safe-bottom);
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.1);
+  max-width: 768px;
+  margin: 0 auto;
+}
+.sheet.show { transform: translateY(0); }
+
+.sheet-handle {
+  width: 36px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 10px auto;
+}
+.sheet-title {
+  text-align: center;
+  font-size: 17px;
+  font-weight: 600;
+  padding: 0 16px 12px;
+  color: var(--text-primary);
+}
+
+.create-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 0 20px 20px;
+}
+.create-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.2s;
+  touch-action: manipulation;
+}
+.create-opt:hover, .create-opt:active { background: var(--surface-hover); border-color: var(--accent); }
+.create-opt .opt-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--accent-light);
+  color: var(--accent-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+.create-opt .opt-label { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+.create-opt .opt-desc { font-size: 12px; color: var(--text-tertiary); text-align: center; }
+
+/* ========== Editor View ========== */
+.editor-view {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--bg);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.editor-view.show { transform: translateX(0); }
+
+.editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 12px 8px;
+  min-height: var(--header-height);
+  flex-shrink: 0;
+}
+.editor-header .left { display: flex; align-items: center; gap: 4px; }
+.editor-header .right { display: flex; align-items: center; gap: 4px; }
+
+.back-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  font-size: 22px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.back-btn:hover, .back-btn:active { background: var(--surface); }
+
+.editor-header .right .icon-btn { width: 34px; height: 34px; font-size: 16px; }
+
+.editor-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 16px 80px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.editor-title-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  outline: none;
+  padding: 8px 0 4px;
+  font-family: var(--font);
+  letter-spacing: -0.3px;
+  resize: none;
+}
+.editor-title-input::placeholder { color: var(--text-tertiary); }
+
+.editor-date {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+/* ========== Rich Content / Todo ========== */
+.editor-content {
+  min-height: 120px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  color: var(--text-primary);
+  outline: none;
+  line-height: 1.6;
+  font-family: var(--font);
+  resize: none;
+}
+.editor-content::placeholder { color: var(--text-tertiary); }
+
+/* Todo in editor */
+.todo-editor { padding: 8px 0; }
+.todo-item-edit {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 4px 0;
+  animation: fadeSlideIn 0.2s ease;
+}
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.todo-item-edit .todo-check {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--text-tertiary);
+  flex-shrink: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  margin-top: 3px;
+  touch-action: manipulation;
+}
+.todo-item-edit .todo-check:hover { border-color: var(--accent); }
+.todo-item-edit .todo-check.checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.todo-item-edit .todo-check.checked::after {
+  content: '✓';
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.todo-item-edit .todo-text-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  color: var(--text-primary);
+  outline: none;
+  line-height: 1.5;
+  font-family: var(--font);
+  padding: 2px 0;
+}
+.todo-item-edit .todo-text-input:focus {
+  border-bottom: 2px solid var(--accent);
+  margin-bottom: -2px;
+}
+.todo-item-edit .todo-text-input.done-text {
+  text-decoration: line-through;
+  color: var(--text-tertiary);
+}
+.todo-item-edit .todo-del {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.todo-item-edit:hover .todo-del,
+.todo-item-edit .todo-del:focus { opacity: 1; }
+.todo-item-edit .todo-del:hover { color: var(--danger); background: var(--danger-light); }
+
+.add-todo-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  color: var(--accent-dark);
+  font-size: 15px;
+  font-weight: 500;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.add-todo-btn:hover { color: var(--accent); }
+
+/* ========== Category Picker ========== */
+.category-picker {
+  display: flex;
+  gap: 6px;
+  padding: 12px 0;
+  flex-wrap: wrap;
+}
+.cat-pill {
+  padding: 4px 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font);
+  touch-action: manipulation;
+}
+.cat-pill:hover { border-color: var(--accent); color: var(--accent-dark); }
+.cat-pill.active { background: var(--accent-light); border-color: var(--accent); color: var(--accent-dark); font-weight: 600; }
+
+.color-picker {
+  display: flex;
+  gap: 8px;
+  padding: 8px 0 12px;
+}
+.color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.2s;
+  touch-action: manipulation;
+}
+.color-swatch:hover { transform: scale(1.15); }
+.color-swatch.active { border-color: var(--text-primary); transform: scale(1.15); }
+
+/* ========== Toast ========== */
+.toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--text-primary);
+  color: var(--bg);
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s;
+  z-index: 100;
+  white-space: nowrap;
+  max-width: 90vw;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ========== Context Menu ========== */
+.ctx-menu {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 60;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.ctx-menu.show { opacity: 1; pointer-events: auto; }
+.ctx-menu-bg {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.3);
+}
+.ctx-menu-content {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: 8px 0 20px;
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  max-width: 768px;
+  margin: 0 auto;
+}
+.ctx-menu.show .ctx-menu-content { transform: translateY(0); }
+.ctx-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  font-size: 16px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.15s;
+  touch-action: manipulation;
+}
+.ctx-menu-item:hover, .ctx-menu-item:active { background: var(--surface-hover); }
+.ctx-menu-item .ctx-icon { font-size: 20px; width: 28px; text-align: center; }
+.ctx-menu-item.danger { color: var(--danger); }
+.ctx-menu-item.danger .ctx-icon { color: var(--danger); }
+.ctx-menu-sep { height: 1px; background: var(--border); margin: 6px 16px; }
+
+/* ========== Swipe Actions ========== */
+/* ========== Responsive ========== */
+@media (min-width: 769px) {
+  .app {
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    box-shadow: 0 0 40px rgba(0,0,0,0.05);
+  }
+}
+@media (max-width: 420px) {
+  .header h1 { font-size: 24px; }
+  .cat-tab { font-size: 13px; padding: 5px 12px; }
+}
+
+/* ========== Animation Helpers ========== */
+.fade-in { animation: fadeIn 0.25s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.slide-up { animation: slideUp 0.3s ease; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <!-- Header -->
+  <div class="header">
+    <h1>便签</h1>
+    <div class="header-actions">
+      <button class="icon-btn" id="syncBtn" title="同步到云端">☁️</button>
+      <button class="icon-btn" id="themeBtn" title="切换深色模式">🌙</button>
+      <button class="icon-btn" id="searchToggleBtn" title="搜索">🔍</button>
+    </div>
+  </div>
+
+  <!-- Search -->
+  <div class="search-bar" id="searchBar" style="display:none">
+    <span class="icon">🔍</span>
+    <input type="text" id="searchInput" placeholder="搜索便签..." autocomplete="off">
+  </div>
+
+  <!-- Category Tabs -->
+  <div class="sync-status" id="syncStatus"><span class="dot offline"></span> <span id="syncStatusText">未连接</span></div>
+<div class="category-tabs" id="categoryTabs">
+    <button class="cat-tab active" data-cat="all">全部</button>
+    <button class="cat-tab" data-cat="personal">个人</button>
+    <button class="cat-tab" data-cat="work">工作</button>
+    <button class="cat-tab" data-cat="ideas">灵感</button>
+    <button class="cat-tab" data-cat="todo">待办</button>
+  </div>
+
+  <!-- Notes List -->
+  <div class="notes-scroll scroll-area" id="notesScroll">
+    <div class="notes-list" id="notesList"></div>
+  </div>
+
+  <!-- FAB -->
+  <button class="fab" id="fabBtn" title="新建便签">+</button>
+</div>
+
+<!-- Create Sheet -->
+<div class="overlay" id="createOverlay"></div>
+<div class="sheet" id="createSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">新建便签</div>
+  <div class="create-options">
+    <div class="create-opt" data-type="note">
+      <div class="opt-icon">📝</div>
+      <div class="opt-label">文字便签</div>
+      <div class="opt-desc">普通文本笔记</div>
+    </div>
+    <div class="create-opt" data-type="todo">
+      <div class="opt-icon">✅</div>
+      <div class="opt-label">待办清单</div>
+      <div class="opt-desc">勾选任务项</div>
+    </div>
+  </div>
+</div>
+
+<!-- Editor View -->
+<div class="editor-view" id="editorView">
+  <div class="editor-header">
+    <div class="left">
+      <button class="back-btn" id="editorBackBtn">←</button>
+    </div>
+    <div class="right">
+      <button class="icon-btn" id="editorColorBtn" title="颜色">🎨</button>
+      <button class="icon-btn" id="editorPinBtn" title="置顶">📌</button>
+      <button class="icon-btn" id="editorMoreBtn" title="更多">⋯</button>
+    </div>
+  </div>
+  <div class="editor-scroll scroll-area">
+    <input class="editor-title-input" id="editorTitleInput" placeholder="标题" maxlength="100">
+    <div class="editor-date" id="editorDate"></div>
+    <div id="editorBody"></div>
+    <!-- Category picker -->
+    <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+      <div class="category-picker" id="editorCategoryPicker"></div>
+      <div class="color-picker" id="editorColorPicker"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Context Menu -->
+<div class="ctx-menu" id="ctxMenu">
+  <div class="ctx-menu-bg" id="ctxMenuBg"></div>
+  <div class="ctx-menu-content">
+    <div class="ctx-menu-item" data-action="pin"><span class="ctx-icon">📌</span> <span id="ctxPinLabel">置顶</span></div>
+    <div class="ctx-menu-sep"></div>
+    <div class="ctx-menu-item" data-action="duplicate"><span class="ctx-icon">📋</span> 复制</div>
+    <div class="ctx-menu-item" data-action="share"><span class="ctx-icon">📤</span> 分享</div>
+    <div class="ctx-menu-sep"></div>
+    <div class="ctx-menu-item danger" data-action="delete"><span class="ctx-icon">🗑️</span> 删除</div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ========== Data ==========
+const COLORS = { none: '无', blue: '蓝色', green: '绿色', red: '红色', purple: '紫色', orange: '橙色', teal: '青色' };
+const CATEGORIES = { personal: '个人', work: '工作', ideas: '灵感', todo: '待办' };
+const STORAGE_KEY = 'notes_app_data';
+const THEME_KEY = 'notes_app_theme';
+
+let notes = [];
+let currentCategory = 'all';
+let editingId = null;
+let searchQuery = '';
+let menuTargetId = null;
+let isDark = false;
+
+// ========== Storage ==========
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    notes = raw ? JSON.parse(raw) : [];
+  } catch(e) { notes = []; }
+}
+let saveTimer = null;
+function saveData() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+  // Auto-sync to cloud after save (debounced)
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    const dot = document.querySelector('#syncStatus .dot');
+    if (dot && dot.classList.contains('online')) {
+      await syncPush();
+    }
+  }, 3000);
+}
+
+function loadTheme() {
+  isDark = localStorage.getItem(THEME_KEY) === 'dark';
+  if (isDark) document.documentElement.classList.add('dark');
+  document.getElementById('themeBtn').textContent = isDark ? '☀️' : '🌙';
+}
+function toggleTheme() {
+  isDark = !isDark;
+  document.documentElement.classList.toggle('dark', isDark);
+  localStorage.setItem(THEME_KEY, isDark ? 'dark' : 'light');
+  document.getElementById('themeBtn').textContent = isDark ? '☀️' : '🌙';
+}
+
+// ========== Helpers ==========
+function uuid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+function formatDate(ts) {
+  const d = new Date(ts);
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const y = d.getFullYear(), m = pad(d.getMonth()+1), day = pad(d.getDate());
+  const h = pad(d.getHours()), min = pad(d.getMinutes());
+  const dateStr = `${y}年${m}月${day}日`;
+  const timeStr = `${h}:${min}`;
+  if (y === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()) {
+    return `今天 ${timeStr}`;
+  }
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (y === yesterday.getFullYear() && d.getMonth() === yesterday.getMonth() && d.getDate() === yesterday.getDate()) {
+    return `昨天 ${timeStr}`;
+  }
+  if (y === now.getFullYear()) return `${m}月${day}日 ${timeStr}`;
+  return `${dateStr} ${timeStr}`;
+}
+
+function noteCount(cat) {
+  if (cat === 'all') return notes.filter(n => !n.deleted).length;
+  if (cat === 'todo') return notes.filter(n => !n.deleted && n.type === 'todo').length;
+  return notes.filter(n => !n.deleted && n.category === cat).length;
+}
+
+// ========== Render ==========
+function renderNotes() {
+  const list = document.getElementById('notesList');
+  const search = document.getElementById('searchInput');
+  const q = searchQuery.toLowerCase().trim();
+
+  let filtered = notes.filter(n => !n.deleted);
+
+  // Category filter
+  if (currentCategory !== 'all') {
+    if (currentCategory === 'todo') {
+      filtered = filtered.filter(n => n.type === 'todo');
+    } else {
+      filtered = filtered.filter(n => n.category === currentCategory);
+    }
+  }
+
+  // Search filter
+  if (q) {
+    filtered = filtered.filter(n => {
+      const title = (n.title || '').toLowerCase();
+      const content = (n.content || '').toLowerCase();
+      if (title.includes(q) || content.includes(q)) return true;
+      if (n.type === 'todo' && n.todos) {
+        return n.todos.some(t => t.text.toLowerCase().includes(q));
+      }
+      return false;
+    });
+  }
+
+  const pinned = filtered.filter(n => n.pinned);
+  const unpinned = filtered.filter(n => !n.pinned);
+
+  if (filtered.length === 0) {
+    list.innerHTML = `
+      <div class="empty-state fade-in">
+        <div class="empty-icon">${q ? '🔍' : (currentCategory === 'todo' ? '✅' : '📝')}</div>
+        <h3>${q ? '未找到匹配的便签' : '暂无便签'}</h3>
+        <p>${q ? '试试换个关键词搜索' : '点击右下角的 + 按钮创建第一条便签'}</p>
+      </div>`;
+    return;
+  }
+
+  let html = '';
+
+  if (pinned.length > 0) {
+    html += `<div class="pinned-section"><div class="pinned-header">📌 置顶</div></div>`;
+    pinned.forEach(n => { html += renderNoteCard(n); });
+  }
+
+  unpinned.forEach(n => { html += renderNoteCard(n); });
+
+  list.innerHTML = html;
+
+  // Attach events
+  list.querySelectorAll('.note-card').forEach(card => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.ctx-trigger')) return;
+      openEditor(card.dataset.id);
+    });
+    // Long press for context menu (mobile)
+    let longPressTimer;
+    card.addEventListener('touchstart', (e) => {
+      longPressTimer = setTimeout(() => {
+        e.preventDefault();
+        showContextMenu(card.dataset.id);
+      }, 500);
+    }, { passive: true });
+    card.addEventListener('touchend', () => clearTimeout(longPressTimer));
+    card.addEventListener('touchmove', () => clearTimeout(longPressTimer));
+  });
+}
+
+function renderNoteCard(n) {
+  let preview = '';
+  if (n.type === 'todo' && n.todos && n.todos.length > 0) {
+    const items = n.todos.slice(0, 3).map(t => `
+      <div class="todo-item">
+        <div class="todo-dot ${t.done ? 'done' : ''}"></div>
+        <div class="todo-text ${t.done ? 'done' : ''}">${escHtml(t.text) || '空白待办'}</div>
+      </div>`).join('');
+    const more = n.todos.length > 3 ? `<div style="color:var(--text-tertiary);font-size:11px;margin-top:2px">还有 ${n.todos.length - 3} 项</div>` : '';
+    preview = `<div class="todo-preview">${items}${more}</div>`;
+  } else {
+    preview = escHtml(n.content || '暂无内容');
+  }
+
+  const catLabel = CATEGORIES[n.category] || '便签';
+  const hasContent = n.content || (n.todos && n.todos.length > 0);
+
+  return `
+    <div class="note-card ${n.pinned ? 'pinned' : ''} slide-up" data-id="${n.id}">
+      <div class="color-bar ${n.color || 'none'}"></div>
+      <div class="card-content">
+        <div class="card-title">${escHtml(n.title) || '无标题'}</div>
+        <div class="card-preview">${hasContent ? preview : '<span style="color:var(--text-tertiary);font-style:italic">空白便签</span>'}</div>
+        <div class="card-meta">
+          <span>${formatDate(n.updatedAt || n.createdAt)}</span>
+          <div class="tags">
+            <span class="tag">${catLabel}</span>
+            ${n.pinned ? '<span class="pin-icon">📌</span>' : ''}
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ========== Category Tabs ==========
+function renderCategoryTabs() {
+  const container = document.getElementById('categoryTabs');
+  const cats = [
+    { key: 'all', label: '全部' },
+    { key: 'personal', label: '个人' },
+    { key: 'work', label: '工作' },
+    { key: 'ideas', label: '灵感' },
+    { key: 'todo', label: '待办' },
+  ];
+  container.innerHTML = cats.map(c => `
+    <button class="cat-tab ${c.key === currentCategory ? 'active' : ''}" data-cat="${c.key}">
+      ${c.label}
+      <span class="badge">${noteCount(c.key)}</span>
+    </button>
+  `).join('');
+  container.querySelectorAll('.cat-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentCategory = btn.dataset.cat;
+      renderCategoryTabs();
+      renderNotes();
+    });
+  });
+}
+
+// ========== Create Note ==========
+function showCreateSheet() {
+  document.getElementById('createOverlay').classList.add('show');
+  document.getElementById('createSheet').classList.add('show');
+}
+function hideCreateSheet() {
+  document.getElementById('createOverlay').classList.remove('show');
+  document.getElementById('createSheet').classList.remove('show');
+}
+
+function createNote(type) {
+  hideCreateSheet();
+  const now = Date.now();
+  const note = {
+    id: uuid(),
+    type: type || 'note',
+    title: '',
+    content: '',
+    todos: type === 'todo' ? [] : undefined,
+    category: 'personal',
+    color: 'none',
+    pinned: false,
+    createdAt: now,
+    updatedAt: now,
+    deleted: false,
+  };
+  notes.unshift(note);
+  saveData();
+  renderCategoryTabs();
+  renderNotes();
+  openEditor(note.id);
+}
+
+// ========== Editor ==========
+function openEditor(id) {
+  const note = notes.find(n => n.id === id);
+  if (!note) return;
+  editingId = id;
+
+  const view = document.getElementById('editorView');
+  document.getElementById('editorTitleInput').value = note.title || '';
+  document.getElementById('editorDate').textContent = `创建于 ${formatDate(note.createdAt)}`;
+
+  if (note.type === 'todo') {
+    renderTodoEditor(note);
+  } else {
+    const body = document.getElementById('editorBody');
+    body.innerHTML = `<textarea class="editor-content" id="editorContent" placeholder="开始记录..." rows="8">${escHtml(note.content || '')}</textarea>`;
+    const ta = document.getElementById('editorContent');
+    ta.addEventListener('input', () => saveEditorState());
+    autoResize(ta);
+  }
+
+  // Pin state
+  updatePinBtn(note.pinned);
+
+  // Category picker
+  renderEditorCategory(note.category);
+
+  // Color picker
+  renderEditorColor(note.color);
+
+  view.classList.add('show');
+  setTimeout(() => {
+    const inp = document.getElementById('editorTitleInput');
+    if (inp) inp.focus();
+  }, 300);
+}
+
+function closeEditor() {
+  saveEditorState();
+  document.getElementById('editorView').classList.remove('show');
+  editingId = null;
+  renderCategoryTabs();
+  renderNotes();
+}
+
+function saveEditorState() {
+  const note = notes.find(n => n.id === editingId);
+  if (!note) return;
+  const title = document.getElementById('editorTitleInput').value.trim();
+  note.title = title;
+
+  if (note.type === 'note') {
+    const ta = document.getElementById('editorContent');
+    if (ta) note.content = ta.value;
+  } else if (note.type === 'todo') {
+    const items = document.querySelectorAll('.todo-item-edit');
+    note.todos = Array.from(items).map(el => ({
+      id: el.dataset.id,
+      text: el.querySelector('.todo-text-input').value,
+      done: el.querySelector('.todo-check').classList.contains('checked'),
+    }));
+  }
+
+  note.updatedAt = Date.now();
+  saveData();
+}
+
+function updatePinBtn(pinned) {
+  const btn = document.getElementById('editorPinBtn');
+  btn.textContent = pinned ? '📌' : '📍';
+  btn.classList.toggle('active', pinned);
+}
+
+function togglePinEditor() {
+  const note = notes.find(n => n.id === editingId);
+  if (!note) return;
+  note.pinned = !note.pinned;
+  updatePinBtn(note.pinned);
+  saveData();
+  toast(note.pinned ? '已置顶' : '已取消置顶');
+}
+
+function renderTodoEditor(note) {
+  const body = document.getElementById('editorBody');
+  const todos = note.todos || [];
+  let html = '<div class="todo-editor" id="todoEditor">';
+  todos.forEach(t => {
+    html += renderTodoItem(t);
+  });
+  html += '</div>';
+  html += `<button class="add-todo-btn" id="addTodoBtn">+ 添加待办</button>`;
+  body.innerHTML = html;
+
+  // Attach events
+  document.getElementById('addTodoBtn').addEventListener('click', () => addTodoItem());
+
+  document.querySelectorAll('.todo-item-edit .todo-text-input').forEach(inp => {
+    inp.addEventListener('input', () => { saveEditorState(); });
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addTodoItem();
+      }
+    });
+  });
+
+  document.querySelectorAll('.todo-item-edit .todo-check').forEach(cb => {
+    cb.addEventListener('click', () => {
+      cb.classList.toggle('checked');
+      const textInput = cb.closest('.todo-item-edit').querySelector('.todo-text-input');
+      textInput.classList.toggle('done-text', cb.classList.contains('checked'));
+      saveEditorState();
+    });
+  });
+
+  document.querySelectorAll('.todo-item-edit .todo-del').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const item = btn.closest('.todo-item-edit');
+      item.style.animation = 'fadeSlideIn 0.2s ease reverse';
+      setTimeout(() => {
+        item.remove();
+        saveEditorState();
+      }, 150);
+    });
+  });
+}
+
+function renderTodoItem(t) {
+  return `
+    <div class="todo-item-edit" data-id="${t.id}">
+      <div class="todo-check ${t.done ? 'checked' : ''}"></div>
+      <input class="todo-text-input ${t.done ? 'done-text' : ''}" value="${escHtml(t.text)}" placeholder="待办事项" maxlength="200">
+      <button class="todo-del">✕</button>
+    </div>`;
+}
+
+function addTodoItem() {
+  const editor = document.getElementById('todoEditor');
+  if (!editor) return;
+  const id = uuid();
+  const div = document.createElement('div');
+  div.innerHTML = renderTodoItem({ id, text: '', done: false });
+  const el = div.firstElementChild;
+  editor.appendChild(el);
+
+  const input = el.querySelector('.todo-text-input');
+  const check = el.querySelector('.todo-check');
+  const del = el.querySelector('.todo-del');
+
+  input.addEventListener('input', () => saveEditorState());
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); addTodoItem(); }
+  });
+  check.addEventListener('click', () => {
+    check.classList.toggle('checked');
+    input.classList.toggle('done-text', check.classList.contains('checked'));
+    saveEditorState();
+  });
+  del.addEventListener('click', () => {
+    el.remove();
+    saveEditorState();
+  });
+
+  input.focus();
+  saveEditorState();
+  // Scroll into view
+  document.getElementById('editorView').querySelector('.editor-scroll').scrollTop = el.offsetTop - 100;
+}
+
+function autoResize(ta) {
+  ta.style.height = 'auto';
+  ta.style.height = ta.scrollHeight + 'px';
+  ta.addEventListener('input', () => {
+    ta.style.height = 'auto';
+    ta.style.height = ta.scrollHeight + 'px';
+  });
+}
+
+// ========== Editor Category Picker ==========
+function renderEditorCategory(selected) {
+  const container = document.getElementById('editorCategoryPicker');
+  const cats = [
+    { key: 'personal', label: '个人', icon: '👤' },
+    { key: 'work', label: '工作', icon: '💼' },
+    { key: 'ideas', label: '灵感', icon: '💡' },
+    { key: 'todo', label: '待办', icon: '✅' },
+  ];
+  container.innerHTML = cats.map(c => `
+    <button class="cat-pill ${c.key === selected ? 'active' : ''}" data-cat="${c.key}">
+      ${c.icon} ${c.label}
+    </button>
+  `).join('');
+  container.querySelectorAll('.cat-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const note = notes.find(n => n.id === editingId);
+      if (note) {
+        note.category = btn.dataset.cat;
+        saveData();
+        renderEditorCategory(note.category);
+      }
+    });
+  });
+}
+
+// ========== Editor Color Picker ==========
+function renderEditorColor(selected) {
+  const container = document.getElementById('editorColorPicker');
+  const colors = [
+    { key: 'none', label: '无', style: 'background:var(--border)' },
+    { key: 'blue', label: '蓝', style: 'background:#2196f3' },
+    { key: 'green', label: '绿', style: 'background:#4caf50' },
+    { key: 'red', label: '红', style: 'background:#f44336' },
+    { key: 'purple', label: '紫', style: 'background:#9c27b0' },
+    { key: 'orange', label: '橙', style: 'background:#ff9800' },
+    { key: 'teal', label: '青', style: 'background:#009688' },
+  ];
+  container.innerHTML = colors.map(c => `
+    <div class="color-swatch ${c.key === selected ? 'active' : ''}" data-color="${c.key}" style="${c.style}" title="${c.label}"></div>
+  `).join('');
+  container.querySelectorAll('.color-swatch').forEach(el => {
+    el.addEventListener('click', () => {
+      const note = notes.find(n => n.id === editingId);
+      if (note) {
+        note.color = el.dataset.color;
+        saveData();
+        renderEditorColor(note.color);
+      }
+    });
+  });
+}
+
+// ========== Context Menu ==========
+function showContextMenu(id) {
+  menuTargetId = id;
+  const note = notes.find(n => n.id === id);
+  if (!note) return;
+  document.getElementById('ctxPinLabel').textContent = note.pinned ? '取消置顶' : '置顶';
+  document.getElementById('ctxMenu').classList.add('show');
+}
+
+function hideContextMenu() {
+  document.getElementById('ctxMenu').classList.remove('show');
+  menuTargetId = null;
+}
+
+function handleContextAction(action) {
+  if (!menuTargetId) return;
+  const note = notes.find(n => n.id === menuTargetId);
+  if (!note) return;
+
+  switch (action) {
+    case 'pin':
+      note.pinned = !note.pinned;
+      saveData();
+      toast(note.pinned ? '已置顶' : '已取消置顶');
+      break;
+    case 'duplicate': {
+      const copy = JSON.parse(JSON.stringify(note));
+      copy.id = uuid();
+      copy.title = note.title ? note.title + ' (副本)' : '';
+      copy.createdAt = Date.now();
+      copy.updatedAt = Date.now();
+      notes.unshift(copy);
+      saveData();
+      toast('已复制');
+      break;
+    }
+    case 'share':
+      shareNote(note);
+      break;
+    case 'delete':
+      deleteNote(note);
+      break;
+  }
+  hideContextMenu();
+  renderCategoryTabs();
+  renderNotes();
+}
+
+function deleteNote(note) {
+  if (editingId === note.id) {
+    closeEditor();
+  }
+  note.deleted = true;
+  saveData();
+  toast('已删除');
+}
+
+async function shareNote(note) {
+  let text = note.title ? `${note.title}\n\n` : '';
+  if (note.type === 'todo' && note.todos) {
+    text += note.todos.map(t => `${t.done ? '✅' : '⬜'} ${t.text}`).join('\n');
+  } else {
+    text += note.content || '';
+  }
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: '便签', text });
+    } else if (navigator.clipboard) {
+      await navigator.clipboard.writeText(text);
+      toast('已复制到剪贴板');
+    } else {
+      toast('分享暂不可用');
+    }
+  } catch(e) {
+    if (e.name !== 'AbortError') toast('分享失败');
+  }
+}
+
+// ========== Toast ==========
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+// ========== Init ==========
+const API_BASE = window.location.origin;
+
+// ========== Cloud Sync ==========
+async function syncPush() {
+  const btn = document.getElementById('syncBtn');
+  const status = document.getElementById('syncStatus');
+  const dot = status.querySelector('.dot');
+  const text = document.getElementById('syncStatusText');
+  btn.classList.add('syncing');
+  dot.className = 'dot syncing';
+  text.textContent = '同步中...';
+  try {
+    const active = notes.filter(n => !n.deleted);
+    const res = await fetch(API_BASE + '/api/notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(active),
+    });
+    if (!res.ok) throw new Error('Sync failed');
+    const result = await res.json();
+    dot.className = 'dot online';
+    text.textContent = '已同步 (' + result.count + ' 条)';
+    localStorage.setItem('notes_last_sync', Date.now().toString());
+    return true;
+  } catch (e) {
+    dot.className = 'dot offline';
+    text.textContent = '同步失败';
+    toast('云同步失败: ' + e.message);
+    return false;
+  } finally {
+    btn.classList.remove('syncing');
+  }
+}
+
+async function syncPull() {
+  const btn = document.getElementById('syncBtn');
+  const status = document.getElementById('syncStatus');
+  const dot = status.querySelector('.dot');
+  const text = document.getElementById('syncStatusText');
+  btn.classList.add('syncing');
+  dot.className = 'dot syncing';
+  text.textContent = '下载中...';
+  try {
+    const res = await fetch(API_BASE + '/api/notes');
+    if (!res.ok) throw new Error('Fetch failed');
+    const serverNotes = await res.json();
+    if (serverNotes.length > 0) {
+      // Merge: prefer newer version
+      const localMap = new Map(notes.filter(n => !n.deleted).map(n => [n.id, n]));
+      for (const sn of serverNotes) {
+        const ln = localMap.get(sn.id);
+        if (!ln || sn.updatedAt > ln.updatedAt) {
+          localMap.set(sn.id, sn);
+        }
+      }
+      // Also keep deleted notes from local
+      const deletedNotes = notes.filter(n => n.deleted);
+      const mergedNotes = Array.from(localMap.values()).concat(deletedNotes);
+      // Sort by creation time descending
+      mergedNotes.sort((a, b) => b.createdAt - a.createdAt);
+      notes = mergedNotes;
+      saveData();
+      renderCategoryTabs();
+      renderNotes();
+    }
+    dot.className = 'dot online';
+    text.textContent = '已同步 (' + serverNotes.length + ' 条)';
+    localStorage.setItem('notes_last_sync', Date.now().toString());
+    return true;
+  } catch (e) {
+    dot.className = 'dot offline';
+    text.textContent = '同步失败';
+    toast('下载失败: ' + e.message);
+    return false;
+  } finally {
+    btn.classList.remove('syncing');
+  }
+}
+
+async function checkSyncStatus() {
+  const dot = document.querySelector('#syncStatus .dot');
+  const text = document.getElementById('syncStatusText');
+  try {
+    const res = await fetch(API_BASE + '/api/health');
+    if (res.ok) {
+      const data = await res.json();
+      dot.className = 'dot online';
+      text.textContent = '已连接 (' + data.notesCount + ' 条)';
+      // Auto-pull if never synced
+      const lastSync = localStorage.getItem('notes_last_sync');
+      if (!lastSync && notes.length === 0) {
+        await syncPull();
+      }
+      return true;
+    }
+  } catch (e) {}
+  dot.className = 'dot offline';
+  text.textContent = '离线模式';
+  return false;
+}
+
+function init() {
+  loadTheme();
+  loadData();
+  checkSyncStatus();
+  renderCategoryTabs();
+  renderNotes();
+
+  // Sync button
+  document.getElementById('syncBtn').addEventListener('click', async () => {
+    const dot = document.querySelector('#syncStatus .dot');
+    if (dot.classList.contains('online')) {
+      await syncPush();
+    } else {
+      await syncPull();
+    }
+  });
+
+  // FAB
+  document.getElementById('fabBtn').addEventListener('click', showCreateSheet);
+
+  // Create sheet
+  document.getElementById('createOverlay').addEventListener('click', hideCreateSheet);
+  document.querySelectorAll('.create-opt').forEach(opt => {
+    opt.addEventListener('click', () => createNote(opt.dataset.type));
+  });
+
+  // Editor back
+  document.getElementById('editorBackBtn').addEventListener('click', closeEditor);
+
+  // Editor actions
+  document.getElementById('editorPinBtn').addEventListener('click', togglePinEditor);
+  document.getElementById('editorMoreBtn').addEventListener('click', () => {
+    showContextMenu(editingId);
+  });
+
+  // Context menu
+  document.getElementById('ctxMenuBg').addEventListener('click', hideContextMenu);
+  document.querySelectorAll('.ctx-menu-item[data-action]').forEach(item => {
+    item.addEventListener('click', () => handleContextAction(item.dataset.action));
+  });
+
+  // Theme
+  document.getElementById('themeBtn').addEventListener('click', toggleTheme);
+
+  // Search
+  document.getElementById('searchToggleBtn').addEventListener('click', () => {
+    const bar = document.getElementById('searchBar');
+    const input = document.getElementById('searchInput');
+    const isHidden = bar.style.display === 'none';
+    bar.style.display = isHidden ? 'flex' : 'none';
+    if (isHidden) {
+      setTimeout(() => input.focus(), 100);
+    } else {
+      searchQuery = '';
+      input.value = '';
+      renderNotes();
+    }
+  });
+  document.getElementById('searchInput').addEventListener('input', (e) => {
+    searchQuery = e.target.value;
+    renderNotes();
+  });
+
+  // Close editor on escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.getElementById('editorView').classList.contains('show')) {
+      closeEditor();
+    }
+  });
+
+  // Prevent scroll propagation from search
+  document.getElementById('searchBar').addEventListener('touchstart', (e) => e.stopPropagation());
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
+
